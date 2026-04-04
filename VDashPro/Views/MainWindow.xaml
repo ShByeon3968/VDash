@@ -34,8 +34,14 @@
 
         <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="5" Background="#2D2D30">
             <Grid>
-                <TextBlock Text="Real-time Telemetry (Altitude &amp; Temp)" Foreground="White" Margin="10,5,0,0" Panel.ZIndex="1"/>
-                <scottplot:WpfPlot x:Name="WpfPlot1" Margin="5"/>
+                <DockPanel LastChildFill="True">
+                    <TextBlock Text="Real-time Telemetry (Altitude &amp; Temp)" 
+                   Foreground="White" 
+                   FontWeight="Bold"
+                   Margin="10,5,0,5" 
+                   DockPanel.Dock="Top"/>
+                    <scottplot:WpfPlot x:Name="WpfPlot1" Margin="5"/>
+                </DockPanel>
             </Grid>
         </Border>
     </Grid>
