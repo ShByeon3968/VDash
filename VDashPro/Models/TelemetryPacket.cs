@@ -10,11 +10,11 @@ namespace VDashPro.Models
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     public struct TelemetryPacket
     {
-        public uint SyncWord;
+        public uint SyncWord; // 시작 확인
         public uint Timestamp;
         public float PosX;
         public float PosY;
-        public float Altitude;
+        public float Altitude; // 고도
         public float Roll;
         public float Pitch;
         public float Yaw;

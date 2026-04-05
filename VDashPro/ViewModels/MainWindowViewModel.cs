@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Prism.Mvvm;
+using VDashPro.Core;
 
 namespace VDashPro.ViewModels
 {
@@ -23,27 +24,20 @@ namespace VDashPro.ViewModels
         private int _currentIndex = 0;
         public event Action DataUpdated; // Render Event
 
-        public MainWindowViewModel()
+        public MainWindowViewModel(INetworkService networkService)
         {
-            // X axis Initialize
-            for (int i = 0; i < DataX.Length; i++)
+            networkService.TelemetryReceived += (packet) =>
             {
-                DataX[i] = i;
-            }
+                UpdateRealData(packet.Altitude);
+            };
+
+            networkService.StartUdpListener(12345);
         }
 
-        public void UpdateDummyData()
+        public void UpdateRealData(float altitude)
         {
-            // 배열을 왼쪽으로 쉬프트 (가장 오래된 데이터 버림)
-            Array.Copy(AltitudeY, 1, AltitudeY, 0, AltitudeY.Length - 1);
-
-            // 새로운 가짜 고도 데이터 생성 (사인파 + 노이즈)
-            double newValue = Math.Sin(_currentIndex * 0.1) * 50 + 1000 + (new Random().NextDouble() * 5);
-            AltitudeY[AltitudeY.Length - 1] = newValue;
-
-            _currentIndex++;
-
-            // View에 차트를 다시 그리라고 알림
+            Array.Copy(AltitudeY, 1, AltitudeY, 0, AltitudeY.Length-1);
+            AltitudeY[AltitudeY.Length - 1] = altitude;
             DataUpdated?.Invoke();
         }
     }

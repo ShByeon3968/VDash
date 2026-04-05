@@ -4,6 +4,7 @@ using System.Windows;
 using Prism.Ioc;
 using Prism.DryIoc;
 using VDashPro.Views;
+using VDashPro.Core;
 
 namespace VDashPro
 {
@@ -19,7 +20,7 @@ namespace VDashPro
 
         protected override void RegisterTypes(IContainerRegistry containerRegistry)
         {
-            
+            containerRegistry.RegisterSingleton<INetworkService, NetworkService>();
         }
     }
 
