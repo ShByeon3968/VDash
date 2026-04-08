@@ -7,69 +7,105 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using VDashPro.Models;
+using System.Threading.Channels;
+using System.Net.Http;
 
 namespace VDashPro.Core
 {
     public interface INetworkService
     {
+        event Action<TelemetryPacket> TelemetryProcessd;
+        event Action<TelemetryPacket> ImageDownloadProgressChanged;
+        event Action<byte[]> ImageReassembled;
+
         void StartServices(int udpPort, int tcpPort);
-        event Action<TelemetryPacket> TelemetryReceived;
-        event Action<double> ImageDownloadProgressChanged;
+        void StopServices();
     }
 
     public class NetworkService : INetworkService
     {
-        public event Action<TelemetryPacket> TelemetryReceived;
-        private UdpClient _udpListener;
-        private TcpListener _tcpListener;
-        private CancellationTokenSource _cts = new CancellationTokenSource();
+        // Event
+        public event Action<TelemetryPacket> TelemetryProcessd;
+        public event Action<TelemetryPacket> ImageDownloadProgressChanged;
+        public event Action<byte[]> ImageReassembled;
 
-        public async void StartServices(int udpPort, int tcpPort)
+        // Listner, Token
+        private UdpClient _udpClient;
+        private TcpListener _tcpListener;
+        private CancellationTokenSource _cts;
+
+        private readonly Channel<TelemetryPacket> _telemetryChannel;
+
+        public NetworkService()
         {
-            Task.Run(() => ListenUdp(udpPort), _cts.Token);
-            Task.Run(() => ListenTcp(tcpPort), _cts.Token);
+            // Unbounded Channel
+            _telemetryChannel = Channel.CreateUnbounded<TelemetryPacket>();
         }
 
-        private async Task ListenUdp(int port)
+        public void StartServices(int udpPort, int tcpPort)
         {
-            _udpListener = new UdpClient(port);
+            _cts = new CancellationTokenSource();
+
+
+        }
+        public void StopServices()
+        {
+
+        }
+
+        private async Task ListenUdpAsync(int port, CancellationToken token)
+        {
+            _udpClient = new UdpClient(port);
             int packetSize = Marshal.SizeOf<TelemetryPacket>();
 
-            while (!_cts.Token.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
                 try
                 {
-                    var result = await _udpListener.ReceiveAsync();
+                    var result = await _udpClient.ReceiveAsync(token);
                     if (result.Buffer.Length == packetSize)
                     {
                         var packet = ByteArrayToStruct<TelemetryPacket>(result.Buffer);
-
-                        // Checksum 검증 로직 (필요 시 추가)
                         if (packet.SyncWord == 0xDEADBEEF)
                         {
-                            TelemetryReceived?.Invoke(packet);
+                            await _telemetryChannel.Writer.WriteAsync(packet, token);
                         }
+
                     }
                 }
-                catch (Exception ex) { /* 로깅 처리 */ }
+                catch (OperationCanceledException) { break; }
+                catch (Exception) { }
             }
         }
 
-        private async Task ListenTcp(int port)
+        private async Task ConsumeTelemetryAsync(CancellationToken token)
+        {
+            await foreach (var packet in _telemetryChannel.Reader.ReadAllAsync(token))
+            {
+                TelemetryProcessd?.Invoke(packet);
+            }
+        }
+
+        private async Task ListenTcpAsync(int port, CancellationToken token)
         {
             _tcpListener = new TcpListener(IPAddress.Any, port);
             _tcpListener.Start();
 
-            while (!_cts.Token.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
-                using (var client = await _tcpListener.AcceptTcpClientAsync())
-                using (var stream = client.GetStream())
+                try
                 {
-                    // [Week 4 상세 구현 예정] 
-                    // TCP 청킹(Chunking) 수신 및 MemoryStream 재조립 로직이 들어갈 자리입니다.
+                    using (var client = await _tcpListener.AcceptTcpClientAsync(token))
+                    using(var stream = client.GetStream()) 
+                    {
+
+                    }
                 }
+                catch (OperationCanceledException) { break; }
+                catch (Exception) { }
             }
         }
+
 
         private T ByteArrayToStruct<T>(byte[] bytes) where T : struct
         {
